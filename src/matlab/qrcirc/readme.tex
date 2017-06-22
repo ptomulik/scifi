@@ -1,14 +1,20 @@
 \documentclass{scrartcl}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
+\usepackage{courier}
+
 \usepackage{amsmath}
 \usepackage{amssymb}
+%\usepackage{amsfonts}
+
 \usepackage[polish,english]{babel}
 \usepackage{commath}
+\usepackage{tgtermes}
+\usepackage{newtxtext}
+%%\usepackage{newtxmath} % FIXME: this breaks \dot + \mathrm
 \usepackage{xifthen}
-\usepackage{courier}
-\usepackage{tgtermes,newtxtext,newtxmath}
-%
+\usepackage[pdftex,colorlinks,allcolors=blue]{hyperref}
+\usepackage{gnuplottex}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %               Algebraic vectors and matrices
@@ -46,11 +52,456 @@ point gets non-zero initial velocity, and moves without friction, without
 gravity and without external excitations (so it should preserve kinetic
 energy). We demonstrate, that naive parametrization of the equations of motion
 by direct use of analytical form of (continuous) QR factorization makes no
-sense in some cases (like the presented one). After this, we reveal numerical
-issues with integration methods based on QR factorization and projections.
+sense in some cases (such as the one being presented). After this, we reveal
+numerical issues with integration methods based on QR factorization and
+projections.
 \end{abstract}
 
-\section{The model}
+\section{Theory 0 - solving equations with QR decomposition}
+
+An under-determined linear system $\mMat{A}\mVec{x} = \mVec{b}$ with $m \times
+n$ matrix $\mMat{A}$, $m < n$ of full row rank, may be solved with QR
+factorization. The standard approach is to decompose tall $n \times m$ matrix
+$\mMat{A}^T$ as follows
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{A}^T
+= \mMat{Q} \mMat{R}
+= \begin{bmatrix} \mMat{Q}_1 & \mMat{Q}_2 \end{bmatrix}
+  \cdot
+  \begin{bmatrix} \mMat{R}_1 \\  \mMat{0} \end{bmatrix}
+  \label{eq:INYH}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where  $\mMat{Q}$ is $n \times n$ orthonormal, i.e. $\mMat{Q}^T \mMat{Q} =
+\mMat{Q}\mMat{Q}^T = \mMat{I}_{m \times m}$, $\mMat{R}_1$ is $m \times m$ upper
+triangular, invertible matrix. The columns of the $n \times m$ matrix
+$\mMat{Q}_1$ form an orthonormal basis of the range space of $\mMat{A}$. The
+columns of the $n \times (n-m)$ matrix $\mMat{Q}_2$ form an orthonormal basis
+of the null-space of $\mMat{A}$.
+
+The under-determined system \eqref{eq:INYH} has a solution that depends on
+$(n-m) \times 1$ parameters $\mVec{z}$
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{x} = \mMat{S} \mVec{b} + \mMat{Q}_2 \mVec{z}
+  \label{eq:1A2S}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where $\mMat{S} = \mMat{Q}_1 \left( \mMat{R}_1^T \right)^{-1}$. Note that by
+the orthogonality of $\mMat{Q}$ we have
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{z} = \mMat{Q}_2^T \mVec{x}
+  \label{eq:36FN}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% \begin{equation}
+%%   \mVec{x}
+%% = \begin{bmatrix} \mMat{Q}_1 & \mMat{Q}_2 \end{bmatrix}
+%%   \begin{bmatrix}
+%%     \left(\mMat{R}_1^T\right)^{-1} \mVec{b}\\
+%%     \mVec{z}
+%%   \end{bmatrix}
+%%   \label{eq:2PHV}
+%% \end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% with arbitrary $\mVec{z}$ (vector of size $d \times 1$).  As $\mVec{z}$ stands
+%% for independent variable, i.e. for arbitrary values of $\mVec{z}$ the original
+%% system of equations must be satisfied, it thus must hold
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% \begin{equation}
+%%   \mMat{A} \mMat{Q}_2 = \mMat{0}_{m \times d}.
+%% \end{equation}
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%% The QR factorization $\mMat{A}^T = \mMat{Q} \mMat{R}$ is unique if
+%% $\mMat{A}$ has full rank and we require $\mMat{R}$ to have positive diagonal
+%% elements ($\mMat{A} = \mMat{Q} \mMat{D} \cdot \mMat{D} \mMat{R}$ is a QR
+%% factorization for any $\mMat{D} = \operatorname{diag}\mOf{\pm 1}$
+%% \cite[p.~356]{higham:2002:accurracy:book}).  Choosing $\mMat{D} =
+%% \operatorname{sign} \mOf{\operatorname{diag}{\mOf{\mMat{R}}}}$ we obtain the
+%% unique factorization $\mMat{Q}\mMat{D} \cdot \mMat{D}\mMat{R}$ from any
+%% valid decomposition $\mMat{Q} \mMat{R}$. The matrices $\mMat{Q}$ and
+%% $\mMat{R}$ are not uniquely determined however, and for single matrix
+%% $\mMat{A}$ there is many possible valid $\mMat{Q} \mMat{R}$ decompositions
+%% (and algorithms are free to pick up any of them). The algorithm in Lapack, for
+%% example, computes QR using Householder reflections and switches sign on
+%% diagonal of $\mMat{R}$ to minimize roundoff errors, thus significant
+%% discontinuities should be expected even if then one smoothly changes
+%% $\mMat{A}$.
+%%
+%% \subsection{Continuity of QR decomposition}
+%%
+%% In our algorithm we need to have all coefficients continuous in time (because
+%% we interpolate them with continuous functions). Mathematicians teach us some
+%% unpleasant facts on functions $\mMat{Z}\mOf{\mMat{A}}$ representing basis
+%% of the nullspace of $\mMat{A}$. First, $\mMat{Z}$ is not unique, second globally
+%% continuous mappings $\mMat{Z}$ exist only in some particular cases, for example
+%% 1-DOF case (nullspace of dimension one) -- Byrd, Schnabel '85. By ``globally''
+%% we mean over all the $\mMat{A}$'s of full rank. Local continuity might be
+%% achieved -- there is special recipe (call it $\mMat{Z}\mOf{\mMat{A}}$) for
+%% a continuous nullspace basis of full-rank matrix $\mMat{A}$ being not so far
+%% from some other full-rank matrix $\mMat{\hat A}$ for which we know $\mMat{\hat
+%% Z}$ to be a nullspace basis. The maximum safe distance is then determined by
+%% the smallest singular value $\sigma_n$ of $\mMat{\hat A}$. Note, that walking
+%% from $\mMat{\hat Z}$ to $\mMat{Z}\mOf{\mMat{A}}$ one usually loses some crucial
+%% properties present at $\mMat{\hat Z}$, for example the orthogonality is not
+%% preserved (one may re-orthogonalize new nullspace basis by Gram-Schmidt, it
+%% preserves continuity).
+%%
+%% \textbf{Question}: it is important question, if the unique $\mMat{Q}\mMat{R}$
+%% decomposition with positive diagonal in $\mMat{R}$ done by Householder
+%% reflections yields continuous $\mMat{Q}_2$? Note: this is not a question about
+%% existence of such continuous mappings but we ask about particular algorithm
+%% with particular class of inputs. The existence of such smooth mapping seems to
+%% be true for $\mMat{A}\mOf{t}$ being a smooth function of \emph{single variable}
+%% $t$ and having full rank everywhere along $t$. Remarks given by Byrd and
+%% Schnabel pertain to functions $\mMat{A}\mOf{\mVec{x}}: \mSetReal^n \mapsto
+%% \mSetReal^{n \times m}$, that is $\mMat{x} \in \mSetReal^n$ and are very
+%% generic (thus seemingly pessimistic). On the other hand, we are interested in
+%% case $\mMat{A}\mOf{t}$, $t \in \mSetReal$ ($t$ is one-dimensional). Maybe a
+%% result of Ważewski (1935) could be helpful, but the paper is in French. It
+%% says, that ``if $\mSetName{D}$ is homeomorphic to a sphere, and if
+%% $\mMat{A}\mOf{\mVec{x}}$ has full rank for all $\mVec{x} \in \mSetName{D}$,
+%% then the continuous function $\mMat{z}\mOf{\mMat{x}}$ determining nullspace
+%% basis of $\mMat{A}\mOf{\mVec{x}}$ exists'' (anyone to interpret this?).
+%%
+%% Let $\mMat{A}^T\mOf{t} \in \mSetName{C}^k\mOf{\mSetReal, \mSetReal^{n\times m}},
+%% n \ge m$ be univariate matrix function with full rank. Then there exist QR
+%% decomposition of $\mMat{A}^T$ which is continuous w.r.t. $t$ everywhere the
+%% $\mMat{A}\mOf{t}$ is. Moreover, the QR preservers smoothness, that is the
+%% matrix functions $\mMat{Q}_1\mOf{t}$ and $\mMat{R}\mOf{t}$ are $\mSetName{C}^k$
+%% and these matrices might be defined by ordinary differential equations that
+%% involve $\mMat{A}\mOf{t}$ and initial values $\mMat{Q}\mOf{t_0}$,
+%% $\mMat{R}\mOf{t_0}$ (see works of Dieci et al. and references therein).
+%%
+%% The unique ``economy size'' decomposition, i.e. the $\mMat{Q}_1 \mMat{R}_1$
+%% with $\mMat{R}_1$ having positive diagonal is continuous as a function of
+%% $\mVec{x} \in \mSetReal^n$ for $\mMat{A}\mOf{\mVec{x}}$, this is claim by
+%% Coleman and Sorensen (1983). It's not clear if the continuity is local or
+%% global. The same authors say, that the algorithm based on Householder
+%% reflections may produce continuous nullspace basis, if feed properly (row
+%% interchange)  or modified to produce this factorization.
+%%
+%% Perhaps answers to all these questions are well known, but I don't
+%% know them for the moment. For that reason I'll rather avoid using nullspaces,
+%% i.e. the QR based algorithm will be carried in $\mSetReal^n$, not in the
+%% independent coordinates from $\mSetReal^{n-m}$.
+%%
+\section{Theory 1 - let's try to solve linear DAEs with QR}
+
+It's tempting to try QR with linear DAEs. Consider the following linear
+time-varying DAEs (that is, all coefficient matrices are functions of time $t$
+and do not depend on coordinates and velocities)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\label{eq:87B0}
+\begin{align}
+    \mMat{M} \mVec{\dot {\hat v}}
+  + \mMat{\Phi}_{\mVec{q}}^T \mVec{\hat \lambda}
+  & = - \mVec{F}_1  - \mMat{F}_{1,\mVec{v}} \mVec{\hat v}
+                    - \mMat{F}_{1,\mVec{q}} \mVec{\hat q}
+  \label{eq:G35J}
+\\
+  \mVec{\dot {\hat q}} & = \mVec{\hat v}
+  \label{eq:U58A}
+\\
+  \mMat{\Phi}_{\mVec{q}} \mVec{\hat q} & = - \mVec{\Phi}
+  \label{eq:4LWR}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+which represent linearized Index-3 equations of motion. In \eqref{eq:87B0}, the
+coefficients $\mMat{M}$, $\mMat{\Phi}_{\mVec{q}}$, $\mVec{F}_1$,
+$\mMat{F}_{1,\mVec{v}}$, $\mMat{F}_{1,\mVec{q}}$ and  $\mVec{F}_2$, are assumed
+to be known functions of scalar $t$, and the unknown functions are $\mVec{\hat
+v}$, $\mVec{\hat q}$, $\mVec{\hat \lambda}$.
+
+In what follows, we will try to determine the underlying ODEs for
+\eqref{eq:87B0} using null-space method based on QR factorization of
+$\mMat{\Phi}_{\mVec{q}}$. First, let's write-out explicitly all the constraint
+equations for \eqref{eq:87B0}, including hidden constraints
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\label{eq:W1MV}
+\begin{align}
+  \mMat{\Phi}_{\mVec{q}} \mVec{\hat q}
+& = - \mVec{\Phi}
+\\
+\mMat{\Phi}_{\mVec{q}} \mVec{\hat v}
+& = - \mVec{\dot \Phi}
+- \mMat{\dot \Phi}_{\mVec{q}} \mVec{\hat q}
+    \equiv \mVec{\nu}
+\\
+\mMat{\Phi}_{\mVec{q}} \mVec{\dot {\hat v}}
+& = - \mVec{\ddot \Phi}
+- \mVec{\ddot \Phi}_{\mVec{q}} \mVec{\hat q}
+    - 2 \, \mMat{\dot \Phi}_{\mVec{q}}
+    \cdot \mVec{\hat v}
+    \equiv \mVec{\gamma}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+If $\mMat{\Phi}_{\mVec{q}}$ is continuous and has full row rank for all $t$ we
+may try to naively assume that there exists continuous QR decomposition of
+$\mMat{\Phi}_{\mVec{q}}^T$ (including the null-space basis $\mMat{Q}_2$). Then
+by \eqref{eq:1A2S} we have the following solution to \eqref{eq:W1MV}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\label{eq:KLREN}
+\begin{align}
+  \mVec{\hat q}
+  & = - \mMat{S} \mVec{\Phi} + \mMat{Q}_2 \mVec{z}
+  \label{eq:TMOIZ}
+\\
+  \mVec{\hat v}
+  & = \mMat{S} \mVec{\nu} + \mMat{Q}_2 \mVec{s}
+  \label{eq:J53RJ}
+\\
+  \mVec{\dot {\hat v}}
+  & = \mMat{S} \mVec{\gamma} + \mMat{Q}_2 \mVec{a}
+  \label{eq:XQKT1}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where $\mVec{z}$, $\mVec{s}$ and $\mVec{a}$ are
+independent coordinates, velocities and accelerations respectively (unknown).
+
+The independent accelerations may be obtained by substituting \eqref{eq:XQKT1}
+in \eqref{eq:G35J} and left-multiplying \eqref{eq:G35J} by $\mMat{Q}_2^T$
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{a} = \left(\mMat{Q}_2^T \mMat{M} \mMat{Q}_2\right)^{-1}
+  \mMat{Q}_2^T \cdot \left(
+      \mVec{\hat g}
+    - \mMat{M} \mMat{S} \mVec{\gamma}
+  \right)
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where $\mVec{\hat g} = - \mVec{F}_1  - \mMat{F}_{1,\mVec{v}}
+\mVec{\hat v} - \mMat{F}_{1,\mVec{q}} \mVec{\hat q}$.
+Coordinates $\mVec{z}$ and velocities $\mVec{s}$ shall
+generally be obtained from ODE integrator. To formulate these ODEs, we need
+to express the derivatives $\mVec{\dot z}$ and $\mVec{\dot
+s}$ as a functions of $\mVec{z}$ and $\mVec{s}$. By
+\eqref{eq:36FN} we have
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{align}
+  & \mVec{z} = \mMat{Q}_2^T \mVec{\hat q}, &
+  & \mVec{s} = \mMat{Q}_2^T \mVec{\hat v} &
+  \label{eq:71BI}
+\end{align}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+and thus
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\label{eq:S5B4P}
+\begin{align}
+  \mVec{\dot z}
+  & = \mVec{s} + \mMat{\dot Q}_2^T \mVec{\hat q}
+\label{eq:MNLPE}
+\\
+\mVec{\dot s}
+& = \mVec{a} + \mMat{\dot Q}_2^T \mVec{\hat v}
+\label{eq:JO0II}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where $\mVec{\hat q}$ shall be determined by \eqref{eq:TMOIZ} and
+$\mVec{\hat v}$ by \eqref{eq:J53RJ}.
+
+\subsection{What's wrong with this approach?}
+
+We've assumed continuity of $\mVec{Q}_2$. A known fact is, that null-space
+basis $\mVec{Q}_2$ is not uniquely determined in general. In consequence, its
+continuity cannot be guaranteed, and state-of-art numerical procedures used to
+generate discontinuous bases. This leads to three problems: (1) the definition
+of independent coordinates $\mVec{z}$ changes at each discontinuity
+point, (2) the derivative $\mMat{\dot Q}_2$ used in \eqref{eq:S5B4P} is
+undefined at discontinuity points, (3) there is no way to predict where the
+discontinuity points will appear.
+
+\section{Theory 2 -- updated null-space basis}
+
+Byrd and Schnabel cite after Goodman the following update formula for a locally
+continuous null-space basis. If $\mMat{\bar Z}$ is any known null-space for
+some matrix $\mMat{\bar A}$, and $\mMat{A}$ is not too far from $\mMat{\bar A}$
+($\mVnorm{\mMat{A}-\mMat{\bar A}} < \sigma$, with $\sigma > 0$ being smallest
+singular value of $\mMat{\bar A}$), then
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{z}\mOf{\mMat{A}} = \left[
+    \mMat{I} - \mVec{\bar A}\left(\mMat{A}^T\mMat{\bar A}\right)^{-1}\mMat{A}^T
+  \right] \mMat{\bar Z}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+is a null-space basis for $\mMat{A}$ (not necessarily orthogonal).
+This recipe is used, for example, by Kim and Vanderploeg to reduce non-linear
+equations of motion. If the null-space basis is determined by means of QR
+factorization, the formula for the updated null-space basis $\mMat{\tilde Q}_2$
+takes the following form
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{\tilde Q}_2 = \left[
+    \mMat{I} - \mMat{\tilde S}\mMat{\Phi}_{\mVec{q}}
+  \right] \mMat{\bar Q}_2
+  \label{eq:O1FSO}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where $\mMat{\bar Q}_1$ and $\mMat{\bar Q}_2$ represent the QR factors for some
+known $\mMat{\bar \Phi}_{\mVec{q}} = \mMat{\Phi}_{\mVec{q}}\mOf{t_{*}}$, and
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{\tilde S} = \mMat{\bar Q}_1 \left(
+    \mMat{\Phi}_{\mVec{q}} \mMat{\bar Q}_1
+  \right)^{-1}
+  \label{eq:H3998}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Note, that $\mMat{\bar Q}_2^T \mMat{\tilde S} = \mMat{0}$,
+$\mMat{\bar Q}_2^T \mMat{\tilde Q}_2 = \mMat{I}$,
+$\mMat{\Phi}_{\mVec{q}} \mMat{\tilde S} = \mMat{I}$ and
+$\mMat{\Phi}_{\mVec{q}} \mMat{\tilde Q}_2 = \mMat{0}$. The solutions
+\eqref{eq:KLREN} to constraints equations now take the form
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\label{eq:LHUIY}
+\begin{align}
+  \mVec{\hat q}
+  & = - \mMat{\tilde S} \mVec{\Phi} + \mMat{\tilde Q}_2 \mVec{z}
+  \label{eq:NUYW4}
+\\
+  \mVec{\hat v}
+  & = \mMat{\tilde S} \mVec{\nu} + \mMat{\tilde Q}_2 \mVec{s}
+  \label{eq:FQVW3}
+\\
+  \mVec{\dot {\hat v}}
+  & = \mMat{\tilde S} \mVec{\gamma} + \mMat{\tilde Q}_2 \mVec{a}
+  \label{eq:JF01O}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The independent variables in \eqref{eq:LHUIY} are not same as in
+\eqref{eq:KLREN}. They're determined as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{align}
+  & \mVec{z} = \mMat{\bar Q}_2^T \mVec{\hat q}, &
+  & \mVec{s} = \mMat{\bar Q}_2^T \mVec{\hat v} &
+  \label{eq:71BJ}
+\end{align}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+$\mMat{\bar Q}_2$ is constant within the neighborhood of $t_{*}$ being
+considered, so $\mMat{\dot {\bar Q}}_2 = \mMat{0}$ and thus
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\begin{align}
+  \mVec{\dot z} & = \mVec{s}
+\\
+\mVec{\dot s} & = \mVec{a}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{a} = \left(\mMat{\tilde Q}_2^T \mMat{M} \mMat{\tilde Q}_2\right)^{-1}
+  \mMat{\tilde Q}_2^T \cdot \left(
+      \mVec{\hat g}
+    - \mMat{M} \mMat{\tilde S} \mVec{\gamma}
+  \right)
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+With updated null-space basis we have more control on the discontinuity points.
+The criterion for the recalculation of QR factors is given in Kim and
+Vanderploeg.
+
+\subsection{Integrating nonlinear DAEs as ODEs with QR factorization}
+
+In what follows, we're solving index-3 equations of motions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+  \begin{align}
+    \mMat{M} \mVec{\ddot q} + \mMat{\Phi}_{\mVec{q}}^T \mVec{\lambda}
+      & = \mVec{g}\mOf{t,\mVec{q},\mVec{\dot q}}
+    \\
+    \mVec{\Phi}\mOf{t,\mVec{q}}
+      &= \mVec{0}
+  \end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The presented approach is based on that of Kim and Vanderploeg. In the original
+paper the authors were projecting the coordinates onto the constraints surface,
+i.e. they were solving the following equations at certain time steps
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \begin{bmatrix}
+    \mVec{\Phi} \mOf{\mVec{q}^{*}} \\
+    \mMat{\bar Q}_2^T \left(\mVec{q}^{*} - \mVec{q} \right)
+  \end{bmatrix}
+  = \mVec{0}
+  \label{eq:K1EVE}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where $\mVec{q}^{*}$ denotes the coordinates projected on constraints surface.
+The resultant Newton iteration was
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\label{eq:V5C00}
+\begin{align}
+  \label{eq:RI0GP}
+  \begin{bmatrix}
+    \mMat{\Phi}_{\mVec{q}}\mOf{\mVec{q}^{(k)}} \\
+    \mMat{\bar Q}_2^T
+  \end{bmatrix}
+  \mVec{\Delta q}^{(k+1)}
+  & = \begin{bmatrix}
+    - \mVec{\Phi}\mOf{\mVec{q}^{(k)}} \\
+    \mVec{0}
+  \end{bmatrix}
+  \\
+  \label{eq:YMYOR}
+  \mVec{q}^{(k+1)} & = \mVec{q}^{(k)} + \mVec{\Delta q}^{(k+1)}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The method required a specialized ODE integrator, where the "state" variables
+were defined as follows
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{y} = \begin{bmatrix}
+    \mVec{q} \\ \mVec{s}
+  \end{bmatrix}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+with $\mVec{s}$ denoting a minimal set of velocities.
+
+Note, that we can't apply traditional ODE integrator directly, because of the
+projection \eqref{eq:K1EVE}. Taking explicit Euler as an example, the time step
+would be
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{q}_{i+1} = \mVec{q}_i + h \cdot \mVec{\dot q}_i,
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+whereas it should be
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{q}_{i+1} = \mVec{q}_i^{*} + h \cdot \mVec{\dot q}_i.
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Traditional solvers, however, have no interface to introduce the modified
+values $\mVec{q}^{*}$ into the integration scheme.
+
+\section{Example}
+
+\subsection{The model}
+
 The equation of motion are
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{subequations}
@@ -65,7 +516,7 @@ The equation of motion are
 \end{subequations}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Constraints and Jacobian}
+\subsection{Constraints and Jacobian}
 
 The motion of the material point is restricted by the following constraint
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -101,7 +552,7 @@ with
 \end{equation}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{QR decomposition}
+\subsection{QR decomposition}
 
 QR decomposition $\mMat{\Phi}_{\mVec{q}}^T = \mMat{Q} \mMat{R}$ may be found in
 an analytical form, and its factors are
@@ -121,7 +572,7 @@ an analytical form, and its factors are
 \end{subequations}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Solving the hidden constraints (QR method)}
+\subsection{Solving the hidden constraints (QR method)}
 
 The hidden constraints \eqref{eq:IQT3I} are simply under-determined linear
 equations, and their solutions are
@@ -139,7 +590,7 @@ The physical interpretation for $s$ and $a$ is the following -- $s$ is the
 modulus of point's velocity, whereas $\mMat{Q}_2 a$ is the tangential component
 of its acceleration.
 
-\section{Solving the nonlinear constraint (QR method)}
+\subsection{Solving the nonlinear constraint (QR method)}
 
 The positional constraint is nonlinear, and we have \textit{no general recipe}
 for position parametrization. A naive decomposition $\mVec{q} = \mMat{Q}_1 r +
@@ -240,7 +691,7 @@ thus
   \left(\mMat{I} + \mMat{Q}_1\mMat{Q}_1^T\right)
 \end{equation}
 
-\section{Determining the ODEs (QR method)}
+\subsection{Determining the ODEs (QR method)}
 
 Our RHS function will compute the following vector of derivatives
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -288,173 +739,234 @@ Finally, our ODEs may be written as
 \end{subequations}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%\section{Results (QR method)}
-%%
-%%In our experiments we run the integration for 1000 seconds and plot the
-%%trajectory. We start from point $\mVec{q}_0 = \begin{bmatrix}1, &
-%%0\end{bmatrix}^T$ and velocity $s = 1$. In an ideal situation the point should
-%%move on the unit circle centered at zero.
-%%
-%%In the first experiment the equations of motion are integrated using ODE45 with
-%%QR factorization and ``internal'' projections. By ``internal'' projections we
-%%mean, that the projections are made only internally within the RHS procedure to
-%%compute $\mMat{Q}_2(q)$, but the integrator still uses state $q^{(0)}$ which is
-%%not projected. The resultant trajectory is plotted on
-%%figure~\ref{fig:QEQGJ}.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{figure}[htbp]
-%%  \begin{center}
-%%    \input{qrcirc1.tex}
-%%    \caption{Trajectory of the point for ODE45 with QR and internal projection}
-%%    \label{fig:QEQGJ}
-%%  \end{center}
-%%\end{figure}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%In the second experiment the equations of motion are integrated using ODE45 with
-%%QR factorization and ``internal'' + ``external'' projections. We simply perform
-%%few (up to five) integration steps and stop integration, then we project
-%%position at the end and start the integration (for the next few steps) starting
-%%from the updated position. The trajectory is shown on figure \ref{fig:S4ETL}.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{figure}[htbp]
-%%  \begin{center}
-%%    \input{qrcirc2.tex}
-%%    \caption{Trajectory of the point for ODE45 with QR and internal + external projection}
-%%    \label{fig:S4ETL}
-%%  \end{center}
-%%\end{figure}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%\section{QR-update method}
-%%
-%%The ``QR-update'' method is the one proposed by Kim and Vanderploeg. The method
-%%uses fixed coordinate system $\mMat{\bar Q}_1 = \mMat{Q}_1\mOf{\mVec{\bar q}}$,
-%%$\mMat{\bar Q}_2 = \mVec{Q}_2\mOf{\mVec{\bar q}}$ generated at some point
-%%$\mVec{\bar q}$ satisfying constraints and an updated coordinate system
-%%$\mVec{\tilde Q}_1\mOf{\mVec{q}}$, $\mVec{\tilde Q}_2\mOf{\mVec{q}}$ at
-%%$\mVec{q}$ in a neighborhood of $\mVec{\bar q}$.
-%%
-%%
-%%In what follows, we'll express the solution to nonlinear constraints as
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{equation}
-%%  \mVec{q} = \mMat{\bar Q}_1 w + \mMat{\bar Q}_2 z
-%%\end{equation}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%\section{Solving the hidden constraints (QR-update method)}
-%%
-%%The hidden constraints \eqref{eq:IQT3I} are solved as
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{align}
-%%  \mVec{\dot q} &= \mMat{\tilde Q}_2 {\dot z}
-%%  \\
-%%  \mVec{\ddot q} &= \mMat{\tilde Q}_2 {\ddot z} + \mMat{\tilde S} \Gamma
-%%\end{align}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%where $\mMat{\tilde Q}_2$ and $\mMat{\tilde S}$ are given by \eqref{eq:O1FSO}
-%%and \eqref{eq:H3998} respectively.
-%%
-%%\section{Solving the nonlinear constraint (QR-update method)}
-%%
-%%To solve the non-linear constraints we formulate the following problem
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{subequations}
-%%\begin{align}
-%%  \mMat{\Phi}\mOf{\mVec{q}} &= 0
-%%  \\
-%%  \mMat{\bar Q}_2^T \left(\mVec{q} - \mVec{\bar q}\right) &= z
-%%\end{align}
-%%\end{subequations}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%this is solved by the following Newton iteration
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{subequations}
-%%\begin{align}
-%%  \begin{bmatrix}
-%%    \mMat{\Phi}_{\mVec{q}}^{(k)} \\
-%%    \mMat{\bar Q}_2^T
-%%  \end{bmatrix}
-%%  \mVec{\Delta q}^{(k+1)}
-%%& = - \begin{bmatrix}
-%%  \mVec{\Phi}^{(k)} \\
-%%  0
-%%\end{bmatrix}
-%%\\
-%%\mVec{q}^{(k+1)}
-%%&= \mVec{q}^{(k)} + \mVec{\Delta q}^{(k+1)}
-%%\end{align}
-%%\end{subequations}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%with $\mVec{q}^{(0)} = \mVec{\bar q} + \mMat{\bar Q}_2 z$.
-%%
-%%\section{Determining the ODEs (QR-update method)}
-%%
-%%The independent accelerations ${\ddot z}$ are determined as
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{equation}
-%%  {\ddot z} = - \left(\mMat{\tilde Q}_2^T\mMat{\tilde Q}_2\right)^{-1}
-%%                \mMat{\tilde Q}_2^T \mMat{\tilde S} \Gamma
-%%\end{equation}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%and the resultant ODEs may be formulated by defining the following independent
-%%variables
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{equation}
-%%  \mVec{y} = \begin{bmatrix} z \\ {\dot z} \end{bmatrix}
-%%\end{equation}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%and then
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{equation}
-%%  \mVec{\dot y} = \begin{bmatrix}
-%%    y_2
-%%    \\
-%%    - \left(\mMat{\tilde Q}_2^T\mMat{\tilde Q}_2\right)^{-1}
-%%      \mMat{\tilde Q}_2^T \mMat{\tilde S} \Gamma
-%%  \end{bmatrix}
-%%\end{equation}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%\section{Results (QR-update methods)}
-%%
-%%The trajectory from QR-update method is presented in figure \ref{fig:C1W1M}.
-%%The error in the kinetic energy is presented on figures \ref{fig:VV69A} and
-%%\ref{fig:5MXRG} for default ODE45 setting and for tolerances set to $10^{-9}$
-%%respectively.
-%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{figure}[htbp]
-%%  \begin{center}
-%%    \input{qrcirc3q.tex}
-%%    \caption{Trajectory of the point for ODE45 with QR-update}
-%%    \label{fig:C1W1M}
-%%  \end{center}
-%%\end{figure}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{figure}[htbp]
-%%  \begin{center}
-%%    \input{qrcirc3e.tex}
-%%    \caption{Error in kinetic energy of the point for ODE45 with default
-%%             tolerances and QR-update}
-%%    \label{fig:VV69A}
-%%  \end{center}
-%%\end{figure}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%\begin{figure}[htbp]
-%%  \begin{center}
-%%    \input{qrcirc3e2.tex}
-%%    \caption{Error in kinetic energy of the point for ODE45 with tolerances set
-%%             to 1E-9 and QR-update}
-%%    \label{fig:5MXRG}
-%%  \end{center}
-%%\end{figure}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Experiment results}
+
+In our experiments we run the integration for 1000 seconds and plot the
+trajectory. We start from point $\mVec{q}_0 = \begin{bmatrix}1, &
+0\end{bmatrix}^T$ and velocity $s = 1$. In an ideal situation the point should
+move on the unit circle centered at zero.
+
+\subsection{Direct use of continuous QR factorization}
+
+In this section we'll present results of two experiments. In the first
+experiment the equations of motion are integrated using ODE45 with QR
+factorization and ``internal'' projections. By ``internal'' projections we
+mean, that the projections are made only internally within the RHS procedure to
+compute $\mMat{Q}_2(q)$, but the integrator still uses state $q^{(0)}$ which is
+not projected. The resultant trajectory is plotted on
+figure~\ref{fig:QEQGJ}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[htbp]
+  \begin{center}
+    \begin{gnuplot}[terminal=epslatex,terminaloptions=color]
+      set size ratio 1;
+      set grid;
+      set key left top;
+      set style line 1 default;
+      set title "ode45 + QR with (int) projections";
+      #set ylabel "$_{(1)}$";
+      set xlabel "$q_1$";
+      set ylabel "$q_2$";
+      plot "qrcirc1.csv" using 1:2 title "$q_1,q_2$" with lines ls 1;
+    \end{gnuplot}
+    \caption{Trajectory of the point for ODE45 with QR and internal projection}
+    \label{fig:QEQGJ}
+  \end{center}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+In the second experiment the equations of motion are integrated using ODE45 with
+QR factorization and ``internal'' + ``external'' projections. We simply perform
+few (up to five) integration steps and stop integration, then we project
+position at the end and start the integration (for the next few steps) starting
+from the updated position. The trajectory is shown on figure \ref{fig:S4ETL}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[htbp]
+  \begin{center}
+    \begin{gnuplot}[terminal=epslatex,terminaloptions=color]
+      set size ratio 1;
+      set grid;
+      set key left top;
+      set style line 1 default;
+      set title "ode45 + QR with (int/ext) projections";
+      #set ylabel "$_{(1)}$";
+      set xlabel "$q_1$";
+      set ylabel "$q_2$";
+      set xrange [-1.5:1.5];
+      set yrange [-1.5:1.5];
+      plot "qrcirc2.csv" using 1:2 title "$q_1,q_2$" with lines ls 1;
+    \end{gnuplot}
+    \caption{Trajectory of the point for ODE45 with QR and internal + external projection}
+    \label{fig:S4ETL}
+  \end{center}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{QR-update method}
+
+The ``QR-update'' method is the one proposed by Kim and Vanderploeg. The method
+uses fixed coordinate system $\mMat{\bar Q}_1 = \mMat{Q}_1\mOf{\mVec{\bar q}}$,
+$\mMat{\bar Q}_2 = \mVec{Q}_2\mOf{\mVec{\bar q}}$ generated at some point
+$\mVec{\bar q}$ satisfying constraints and an updated coordinate system
+$\mVec{\tilde Q}_1\mOf{\mVec{q}}$, $\mVec{\tilde Q}_2\mOf{\mVec{q}}$ at
+$\mVec{q}$ in a neighborhood of $\mVec{\bar q}$.
+
+
+In what follows, we'll express the solution to nonlinear constraints as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{q} = \mMat{\bar Q}_1 w + \mMat{\bar Q}_2 z
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Solving the hidden constraints (QR-update method)}
+
+The hidden constraints \eqref{eq:IQT3I} are solved as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{align}
+  \mVec{\dot q} &= \mMat{\tilde Q}_2 {\dot z}
+  \\
+  \mVec{\ddot q} &= \mMat{\tilde Q}_2 {\ddot z} + \mMat{\tilde S} \Gamma
+\end{align}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where $\mMat{\tilde Q}_2$ and $\mMat{\tilde S}$ are given by \eqref{eq:O1FSO}
+and \eqref{eq:H3998} respectively.
+
+\subsection{Solving the nonlinear constraint (QR-update method)}
+
+To solve the non-linear constraints we formulate the following problem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\begin{align}
+  \mMat{\Phi}\mOf{\mVec{q}} &= 0
+  \\
+  \mMat{\bar Q}_2^T \left(\mVec{q} - \mVec{\bar q}\right) &= z
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+this is solved by the following Newton iteration
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\begin{align}
+  \begin{bmatrix}
+    \mMat{\Phi}_{\mVec{q}}^{(k)} \\
+    \mMat{\bar Q}_2^T
+  \end{bmatrix}
+  \mVec{\Delta q}^{(k+1)}
+& = - \begin{bmatrix}
+  \mVec{\Phi}^{(k)} \\
+  0
+\end{bmatrix}
+\\
+\mVec{q}^{(k+1)}
+&= \mVec{q}^{(k)} + \mVec{\Delta q}^{(k+1)}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+with $\mVec{q}^{(0)} = \mVec{\bar q} + \mMat{\bar Q}_2 z$.
+
+\subsection{Determining the ODEs (QR-update method)}
+
+The independent accelerations ${\ddot z}$ are determined as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  {\ddot z} = - \left(\mMat{\tilde Q}_2^T\mMat{\tilde Q}_2\right)^{-1}
+                \mMat{\tilde Q}_2^T \mMat{\tilde S} \Gamma
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+and the resultant ODEs may be formulated by defining the following independent
+variables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{y} = \begin{bmatrix} z \\ {\dot z} \end{bmatrix}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+and then
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{\dot y} = \begin{bmatrix}
+    y_2
+    \\
+    - \left(\mMat{\tilde Q}_2^T\mMat{\tilde Q}_2\right)^{-1}
+      \mMat{\tilde Q}_2^T \mMat{\tilde S} \Gamma
+  \end{bmatrix}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Results (QR-update methods)}
+
+The trajectory from QR-update method is presented in figure \ref{fig:C1W1M}.
+The error in the kinetic energy is presented on figures \ref{fig:VV69A} and
+\ref{fig:5MXRG} for default ODE45 setting and for tolerances set to $10^{-9}$
+respectively.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[htbp]
+  \begin{center}
+    \begin{gnuplot}[terminal=epslatex,terminaloptions=color]
+      set size ratio 1;
+      set grid;
+      set key left top;
+      set style line 1 default;
+      set title "ode45 + QR-update";
+      #set ylabel "$_{(1)}$";
+      set xlabel "$q_1$";
+      set ylabel "$q_2$";
+      set xrange [-1.5:1.5];
+      set yrange [-1.5:1.5];
+      plot "qrcirc3q.csv" using 1:2 title "$q_1,q_2$" with lines ls 1;
+    \end{gnuplot}
+    \caption{Trajectory of the point for ODE45 with QR-update}
+    \label{fig:C1W1M}
+  \end{center}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[htbp]
+  \begin{center}
+    \begin{gnuplot}[terminal=epslatex,terminaloptions=color]
+      set size ratio 1;
+      set grid;
+      set key left top;
+      set style line 1 default;
+      set title "ode45 with default tolerances + QR-update";
+      #set ylabel "$_{(1)}$";
+      set xlabel "$t$";
+      set ylabel "$E_k$";
+      set xrange [0:1000];
+      set yrange [0:3.5];
+      plot "qrcirc3e.csv" using 1:2 title "$(E_k - 0.5)$" with lines ls 1;
+    \end{gnuplot}
+    \caption{Error in kinetic energy of the point for ODE45 with default
+             tolerances and QR-update}
+    \label{fig:VV69A}
+  \end{center}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[htbp]
+  \begin{center}
+    \begin{gnuplot}[terminal=epslatex,terminaloptions=color]
+      set size ratio 1;
+      set grid;
+      set key left top;
+      set style line 1 default;
+      set title "ode45 (with tolerances set to 1E-9) + QR-update";
+      #set ylabel "$_{(1)}$";
+      set xlabel "$t$";
+      set ylabel "$E_k$";
+      set xrange [0:1000];
+      set yrange [0:8e-7];
+      plot "qrcirc3e2.csv" using 1:2 title "$(E_k - 0.5)$" with lines ls 1;
+    \end{gnuplot}
+    \caption{Error in kinetic energy of the point for ODE45 with tolerances set
+             to 1E-9 and QR-update}
+    \label{fig:5MXRG}
+  \end{center}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 % P. Tomulik: my bibliography

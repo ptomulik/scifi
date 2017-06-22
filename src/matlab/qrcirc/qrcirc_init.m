@@ -9,6 +9,10 @@ global Q2u;
 global R1u;
 global Su;
 
+if(exist('OCTAVE_VERSION', 'builtin') > 0)
+    pkg load odepkg
+end
+
 % For all methods
 PHI = @(q) q(1).^2 + q(2).^2 - 1;
 PHI_q = @(q) 2.*[q(1), q(2)];

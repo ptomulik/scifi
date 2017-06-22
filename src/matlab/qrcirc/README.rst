@@ -18,7 +18,7 @@ being demonstrated here
 Running examples
 ````````````````
 
-In Matlab or Octave
+In Matlab or Octave (you'll need ``octave-odepkg`` package)
 
 .. code:: matlab
 
