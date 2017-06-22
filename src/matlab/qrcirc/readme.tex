@@ -1,0 +1,476 @@
+\documentclass{scrartcl}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[polish,english]{babel}
+\usepackage{commath}
+\usepackage{xifthen}
+\usepackage{courier}
+\usepackage{tgtermes,newtxtext,newtxmath}
+%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%               Algebraic vectors and matrices
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   \mMat{A}        Algebraic matrix
+\newcommand\mMat[1]{\ensuremath{\boldsymbol{\mathrm{#1}}}}
+%   \mVec{v}        Algebraic vector (single column algebraic matrix)
+\newcommand\mVec[1]{\ensuremath{\boldsymbol{\mathrm{#1}}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%               Enclosing arguments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\newcommand\mOf[1]{\left({#1}\right)}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%               Functionals, mappings, operators
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%   \mVnorm{X}      Vector norm
+\newcommand\mVnorm[2][]{%
+  \ifthenelse{\isempty{#1}}{\left\|{#2}\right\|}{\left\|{#2}\right\|_{#1}}}
+
+\title{QRCirc}
+\subtitle{QR factorization applied to DAEs describing point on circle (mathematical pendulum)}
+\author{Paweł Tomulik}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This example explains some problems with integration of the Index-3 DAEs using
+QR decomposition and standard explicit ODE solvers. We consider simple material
+point whose motion is restricted to a unit circle $q_1^2 + q_2^2 = 1$. The
+point gets non-zero initial velocity, and moves without friction, without
+gravity and without external excitations (so it should preserve kinetic
+energy). We demonstrate, that naive parametrization of the equations of motion
+by direct use of analytical form of (continuous) QR factorization makes no
+sense in some cases (like the presented one). After this, we reveal numerical
+issues with integration methods based on QR factorization and projections.
+\end{abstract}
+
+\section{The model}
+The equation of motion are
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\label{eq:6HKMG}
+\begin{align}
+  \label{eq:X83SF}
+  \mVec{\ddot q} + \mMat{\Phi}_{\mVec{q}}^T \mVec{\lambda} &= \mVec{0}
+  \\
+  \label{eq:HVFIS}
+  \mVec{\Phi}\mOf{\mVec{q}} &= \mVec{0}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Constraints and Jacobian}
+
+The motion of the material point is restricted by the following constraint
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{\Phi}\mOf{\mVec{q}} \triangleq q_1^2 + q_2^2 - 1 = 0
+  \label{eq:90ZU7}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+For this constraint the Jacobian matrix is
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{\Phi}_{\mVec{q}}\mOf{\mVec{q}} = 2 \cdot \begin{bmatrix}
+    q_1 & q_2
+  \end{bmatrix}
+  \label{eq:5L0HL}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The other invariants (hidden constraints) are
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\label{eq:IQT3I}
+\begin{align}
+  \mMat{\Phi}_{\mVec{q}}\mVec{\dot q} &= \mVec{0}
+  \\
+  \mMat{\Phi}_{\mVec{q}}\mVec{\ddot q} &= \mVec{\Gamma}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+with
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{\Gamma} = - 2 \left( {\dot q}_2^2 + {\dot q}_2^2 \right)
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{QR decomposition}
+
+QR decomposition $\mMat{\Phi}_{\mVec{q}}^T = \mMat{Q} \mMat{R}$ may be found in
+an analytical form, and its factors are
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\begin{align}
+  \mMat{Q}_1 & = \frac{1}{\sqrt{q_1^2 + q_1^2}} \begin{bmatrix}
+    q_1 \\ q_2
+  \end{bmatrix}
+  \\
+  \mMat{Q}_2 & = \frac{1}{\sqrt{q_1^2 + q_2^2}} \begin{bmatrix}
+    q_2 \\ -q_1
+  \end{bmatrix}
+  \\
+  \mMat{R}_1 & = 2 \sqrt{q_1^2 + q_2^2}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Solving the hidden constraints (QR method)}
+
+The hidden constraints \eqref{eq:IQT3I} are simply under-determined linear
+equations, and their solutions are
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{align}
+  \mVec{\dot q}   & = \mMat{Q}_2 \cdot s
+  \label{eq:38DY7}
+  \\
+  \mVec{\ddot q}  & = \mMat{Q}_1 \mMat{R}_1^{-T} \mVec{\Gamma}
+                    + \mMat{Q}_2 \cdot a
+  \label{eq:EKLKN}
+\end{align}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The physical interpretation for $s$ and $a$ is the following -- $s$ is the
+modulus of point's velocity, whereas $\mMat{Q}_2 a$ is the tangential component
+of its acceleration.
+
+\section{Solving the nonlinear constraint (QR method)}
+
+The positional constraint is nonlinear, and we have \textit{no general recipe}
+for position parametrization. A naive decomposition $\mVec{q} = \mMat{Q}_1 r +
+\mMat{Q}_2 z$ does not reveal anything useful, as we simply have $r \equiv 1$
+and $z \equiv 0$ on each point of the unit circle (the orthogonal component $r$
+is simply the circle radius).
+
+For this particular case (that is for the point moving along circle) we could
+propose the parameter $z$ to be length of the arc traversed by the point, so we
+had $\mVec{q} = \begin{bmatrix} \cos{z}, & \sin{z} \end{bmatrix}^T$
+and ${\dot z} = s$. Note, however, that this is simply an analytical solution
+to the non-linear constraints~\eqref{eq:90ZU7} which is not available in
+general case. Also, such a case-by-case parametrization has nothing to do with
+the QR decomposition, so the work related to QR factorization is simply wasted.
+
+Another approach, which is proposed by Kim and Vanderploeg, is to not
+para\-me\-tri\-ze the positions for integration, and formulate the variables to
+be integrated as $\mVec{y} = \begin{bmatrix} \mVec{q}^T, & \mVec{s}^T
+\end{bmatrix}$. The authors then project the positions onto the constraints
+surface orthogonally to some fixed hyperplane. We'll follow this approach, but
+our projection will be orthogonal to the constraint surface.
+
+Assuming, that $\mVec{q}^{(0)}$ is an inaccurate position provided by the
+integrator (apart from constraints) we may search for the corrected position
+$\mVec{q}$ by the following projection orthogonal to the constraints surface at
+$\mVec{q}$
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\begin{align}
+  (\mVec{q} - \mVec{q}^{(0)})^{T} (\mVec{q} - \mVec{q}^{(0)})
+    & \rightarrow \min
+  \\
+  \text{w.r.t.}\;\;\mVec{\Phi}\mOf{\mVec{q}}
+    & = \mVec{0}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+This is equivalent to the following nonlinear problem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\begin{align}
+  \mVec{\Phi}\mOf{\mVec{q}} & = \mVec{0}
+  \\
+  \mMat{Q}_2^T\mOf{\mVec{q}}(\mVec{q} - \mVec{q}^{(0)}) &= \mVec{0}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+which may be numerically solved by the following Newton iteration
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+\begin{align}
+  \begin{bmatrix}
+    \mMat{\Phi}_{\mVec{q}}^{(k)} \\
+    \mMat{J}_{\parallel}^{(k)}
+  \end{bmatrix}
+  \mVec{\Delta q}^{(k+1)}
+  & = - \begin{bmatrix}
+    \mVec{\Phi}^{(k)} \\
+    \mMat{Q}_2^{T\,(k)} \left(\mVec{q}^{(k)} - \mVec{q}^{(0)}\right)
+  \end{bmatrix}
+  \\
+  \mVec{q}^{(k+1)} &= \mVec{q}^{(k)} + \mVec{\Delta q}^{(k+1)}
+\end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+where
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{J}_{\parallel}\mOf{\mVec{q}} = \frac{\partial}{\partial \mVec{q}}\left\{
+    \mMat{Q}_2^{T}\mOf{\mVec{q}} \cdot \left(\mVec{q} - \mVec{q}^{(0)}\right)
+  \right\}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+In our circle example we have
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{Q}_2^T \cdot \left(\mVec{q} - \mVec{q}^{(0)}\right)
+  = \frac{q_1 q_2^{(0)} - q_2 q_1^{(0)}}{\sqrt{q_1^2 + q_2^2}}
+  = \begin{bmatrix} q_2^{(0)}, & -q_1^{(0)} \end{bmatrix} \mMat{Q}_1
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+and it may be shown, that
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \frac{\dif}{\dif t}\left\{
+    \mMat{Q}_2^T \cdot \left(\mVec{q} - \mVec{q}^{(0)}\right)
+  \right\}
+  = \frac{\begin{bmatrix} q_2^{(0)}, & -q_1^{(0)} \end{bmatrix}}{\mVnorm{\mVec{q}}}
+    \left(\mMat{I} + \mMat{Q}_1\mMat{Q}_1^T\right) \mVec{\dot q}
+  = \mMat{J}_{\parallel} \mVec{\dot q}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+thus
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mMat{J}_{\parallel}
+= \frac{\begin{bmatrix} q_2^{(0)}, & -q_1^{(0)} \end{bmatrix}}{\mVnorm{\mVec{q}}}
+  \left(\mMat{I} + \mMat{Q}_1\mMat{Q}_1^T\right)
+\end{equation}
+
+\section{Determining the ODEs (QR method)}
+
+Our RHS function will compute the following vector of derivatives
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  \mVec{\dot y} = \begin{bmatrix}
+    \mVec{\dot q} \\
+    \mVec{\dot s}
+  \end{bmatrix}
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The $\mVec{\dot q}$ is already defined by \eqref{eq:38DY7}, and for ${\dot s}$
+we use fact that $s = \mMat{Q}_2^T \mVec{\dot q}$, so
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  {\dot s} =  \frac{\dif}{\dif t}\left\{\mMat{Q}_2^T\mVec{\dot q}\right\}
+  = \mMat{\dot Q}_2^T \mVec{\dot q}
+  + \mMat{Q}_2^T \mVec{\ddot q}
+  = \mMat{\dot Q}_2^T \mVec{Q}_2 s
+  + \mMat{Q}_2^T \mMat{Q}_1 \mMat{R}_1^{-T} \mVec{\Gamma}
+  + \mMat{Q}_2^T \mMat{Q}_2 a
+  = a
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+because $\mMat{\dot Q}_2^T\mMat{Q}_2 = 0$ \footnote{Note, that
+$\mMat{\dot Q}_2^T\mMat{Q}_2 = - \mMat{Q}_2^T \mMat{\dot Q}_2$ (because
+$\mMat{Q}_2^T\mMat{Q}_2 = 1 = const)$. But in our (1-DOF) case it's it must
+hold $\mMat{\dot Q}_2^T\mMat{Q}_2 = \mMat{Q}_2^T\mMat{\dot Q}_2$ at the same
+time, so the product may only be zero.}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The variable $a$ might be determined from the equation of motion
+\eqref{eq:X83SF} and \eqref{eq:EKLKN} from which we simply get
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{equation}
+  a = 0
+\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Finally, our ODEs may be written as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{subequations}
+  \begin{align}
+    \mVec{\dot q} &= \mMat{Q}_2 s
+    \\
+    {\dot s} &= 0
+  \end{align}
+\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%\section{Results (QR method)}
+%%
+%%In our experiments we run the integration for 1000 seconds and plot the
+%%trajectory. We start from point $\mVec{q}_0 = \begin{bmatrix}1, &
+%%0\end{bmatrix}^T$ and velocity $s = 1$. In an ideal situation the point should
+%%move on the unit circle centered at zero.
+%%
+%%In the first experiment the equations of motion are integrated using ODE45 with
+%%QR factorization and ``internal'' projections. By ``internal'' projections we
+%%mean, that the projections are made only internally within the RHS procedure to
+%%compute $\mMat{Q}_2(q)$, but the integrator still uses state $q^{(0)}$ which is
+%%not projected. The resultant trajectory is plotted on
+%%figure~\ref{fig:QEQGJ}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{figure}[htbp]
+%%  \begin{center}
+%%    \input{qrcirc1.tex}
+%%    \caption{Trajectory of the point for ODE45 with QR and internal projection}
+%%    \label{fig:QEQGJ}
+%%  \end{center}
+%%\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%In the second experiment the equations of motion are integrated using ODE45 with
+%%QR factorization and ``internal'' + ``external'' projections. We simply perform
+%%few (up to five) integration steps and stop integration, then we project
+%%position at the end and start the integration (for the next few steps) starting
+%%from the updated position. The trajectory is shown on figure \ref{fig:S4ETL}.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{figure}[htbp]
+%%  \begin{center}
+%%    \input{qrcirc2.tex}
+%%    \caption{Trajectory of the point for ODE45 with QR and internal + external projection}
+%%    \label{fig:S4ETL}
+%%  \end{center}
+%%\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%\section{QR-update method}
+%%
+%%The ``QR-update'' method is the one proposed by Kim and Vanderploeg. The method
+%%uses fixed coordinate system $\mMat{\bar Q}_1 = \mMat{Q}_1\mOf{\mVec{\bar q}}$,
+%%$\mMat{\bar Q}_2 = \mVec{Q}_2\mOf{\mVec{\bar q}}$ generated at some point
+%%$\mVec{\bar q}$ satisfying constraints and an updated coordinate system
+%%$\mVec{\tilde Q}_1\mOf{\mVec{q}}$, $\mVec{\tilde Q}_2\mOf{\mVec{q}}$ at
+%%$\mVec{q}$ in a neighborhood of $\mVec{\bar q}$.
+%%
+%%
+%%In what follows, we'll express the solution to nonlinear constraints as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{equation}
+%%  \mVec{q} = \mMat{\bar Q}_1 w + \mMat{\bar Q}_2 z
+%%\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%\section{Solving the hidden constraints (QR-update method)}
+%%
+%%The hidden constraints \eqref{eq:IQT3I} are solved as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{align}
+%%  \mVec{\dot q} &= \mMat{\tilde Q}_2 {\dot z}
+%%  \\
+%%  \mVec{\ddot q} &= \mMat{\tilde Q}_2 {\ddot z} + \mMat{\tilde S} \Gamma
+%%\end{align}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%where $\mMat{\tilde Q}_2$ and $\mMat{\tilde S}$ are given by \eqref{eq:O1FSO}
+%%and \eqref{eq:H3998} respectively.
+%%
+%%\section{Solving the nonlinear constraint (QR-update method)}
+%%
+%%To solve the non-linear constraints we formulate the following problem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{subequations}
+%%\begin{align}
+%%  \mMat{\Phi}\mOf{\mVec{q}} &= 0
+%%  \\
+%%  \mMat{\bar Q}_2^T \left(\mVec{q} - \mVec{\bar q}\right) &= z
+%%\end{align}
+%%\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%this is solved by the following Newton iteration
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{subequations}
+%%\begin{align}
+%%  \begin{bmatrix}
+%%    \mMat{\Phi}_{\mVec{q}}^{(k)} \\
+%%    \mMat{\bar Q}_2^T
+%%  \end{bmatrix}
+%%  \mVec{\Delta q}^{(k+1)}
+%%& = - \begin{bmatrix}
+%%  \mVec{\Phi}^{(k)} \\
+%%  0
+%%\end{bmatrix}
+%%\\
+%%\mVec{q}^{(k+1)}
+%%&= \mVec{q}^{(k)} + \mVec{\Delta q}^{(k+1)}
+%%\end{align}
+%%\end{subequations}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%with $\mVec{q}^{(0)} = \mVec{\bar q} + \mMat{\bar Q}_2 z$.
+%%
+%%\section{Determining the ODEs (QR-update method)}
+%%
+%%The independent accelerations ${\ddot z}$ are determined as
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{equation}
+%%  {\ddot z} = - \left(\mMat{\tilde Q}_2^T\mMat{\tilde Q}_2\right)^{-1}
+%%                \mMat{\tilde Q}_2^T \mMat{\tilde S} \Gamma
+%%\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%and the resultant ODEs may be formulated by defining the following independent
+%%variables
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{equation}
+%%  \mVec{y} = \begin{bmatrix} z \\ {\dot z} \end{bmatrix}
+%%\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%and then
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{equation}
+%%  \mVec{\dot y} = \begin{bmatrix}
+%%    y_2
+%%    \\
+%%    - \left(\mMat{\tilde Q}_2^T\mMat{\tilde Q}_2\right)^{-1}
+%%      \mMat{\tilde Q}_2^T \mMat{\tilde S} \Gamma
+%%  \end{bmatrix}
+%%\end{equation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%\section{Results (QR-update methods)}
+%%
+%%The trajectory from QR-update method is presented in figure \ref{fig:C1W1M}.
+%%The error in the kinetic energy is presented on figures \ref{fig:VV69A} and
+%%\ref{fig:5MXRG} for default ODE45 setting and for tolerances set to $10^{-9}$
+%%respectively.
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{figure}[htbp]
+%%  \begin{center}
+%%    \input{qrcirc3q.tex}
+%%    \caption{Trajectory of the point for ODE45 with QR-update}
+%%    \label{fig:C1W1M}
+%%  \end{center}
+%%\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{figure}[htbp]
+%%  \begin{center}
+%%    \input{qrcirc3e.tex}
+%%    \caption{Error in kinetic energy of the point for ODE45 with default
+%%             tolerances and QR-update}
+%%    \label{fig:VV69A}
+%%  \end{center}
+%%\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%\begin{figure}[htbp]
+%%  \begin{center}
+%%    \input{qrcirc3e2.tex}
+%%    \caption{Error in kinetic energy of the point for ODE45 with tolerances set
+%%             to 1E-9 and QR-update}
+%%    \label{fig:5MXRG}
+%%  \end{center}
+%%\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% P. Tomulik: my bibliography
+%%\bibliographystyle{spmpsci}
+%%\bibliography{readme}
+% P. Tomulik: end
+
+\end{document}
+% end of file template.tex
+
+% \label{?:45K37}
+% \label{?:GN2B2}
+% \label{?:TCRQA}
+% \label{?:X9Z2K}
+% \label{?:2A6JG}
+% \label{?:WBSNK}
+
+% vim: set expandtab syntax=tex tabstop=2 shiftwidth=2:
+% vim: set foldmethod=marker foldcolumn=4:

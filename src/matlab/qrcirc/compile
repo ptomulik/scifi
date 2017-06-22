@@ -1,0 +1,5 @@
+#!/bin/sh
+
+pdflatex readme.tex
+pdflatex readme.tex
+pdflatex readme.tex
