@@ -10,6 +10,10 @@ wav{1}.q = @(t)([1;0] + [0;t]);
 wav{1}.dq = @(t)([0;1]);
 wav{1}.ddq = @(t)([0;0]);
 wav{1}.lambda = @(t)(1);
+om = 6/5;
+%%wav{1}.q = @(t)([(1-1/om) + 1/om*cos(om*t); 1/om*sin(om*t)]);
+%%wav{1}.dq = @(t)([-sin(om*t); cos(om*t)]);
+%%wav{1}.ddq = @(t)([-om*cos(om*t); -om*sin(om*t)]);
 
 z0 = 0;
 s0 = 0;
