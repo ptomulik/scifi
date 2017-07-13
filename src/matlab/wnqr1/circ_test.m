@@ -1,7 +1,7 @@
 clear all;
 close all;
 
-sys = sys_circ;
+sys = circ_sys;
 
 tspan = [0, 2.*pi];
 
