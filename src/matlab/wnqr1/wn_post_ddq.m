@@ -1,7 +1,7 @@
 function ddq = wn_post_ddq(t, x, sys, wav)
 
-  [z, s] = wn_ode_unpack(x);
-  [Phi, S, Q2, dPhi, dPhi_q, ddPhi, ddPhi_q, dQ2] = wn_ode_rhs_constr(t, z, s, sys, wav);
+  [u, s] = wn_ode_unpack(x);
+  [Phi, S, Q2, dPhi, dPhi_q, ddPhi, ddPhi_q, dQ2] = wn_ode_rhs_constr(t, u, s, sys, wav);
 
   q = wn_post_q(t, x, sys, wav);
   dq = wn_post_dq(t, x, sys, wav);

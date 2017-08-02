@@ -1,4 +1,4 @@
-function varargout = wn_ode_rhs_constr(t, z, s, sys, wav)
+function varargout = wn_ode_rhs_constr(t, u, s, sys, wav)
 
 if nargout >= 1
   q = wav.q(t);

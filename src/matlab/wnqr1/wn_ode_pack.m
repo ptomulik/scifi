@@ -1,2 +1,2 @@
-function x = wn_ode_pack(z, s)
- x = [s; z];
+function x = wn_ode_pack(u, s)
+ x = [s; u];
