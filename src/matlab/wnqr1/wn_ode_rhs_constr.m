@@ -1,4 +1,3 @@
-%function [S, Q2, dQ2, Phi, dPhi, ddPhi, Phi_q, dPhi_q, ddPhi_q] = wn_ode_rhs_constr(t, z, s, sys, wav)
 function varargout = wn_ode_rhs_constr(t, z, s, sys, wav)
 
 if nargout >= 1
